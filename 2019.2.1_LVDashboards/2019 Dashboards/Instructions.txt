@@ -1,0 +1,25 @@
+Quick Instructions:
+Run the 2019.2.1 dashboard that includes a longer timeout for camera connections to the field.
+If the message in the camera display indicates it is waiting for network tables, restart the driver station executable and/or the dashboard.
+If the messages in the camera display toggles between robot addresses without counting down or showing the name of the camera, restart robot code.
+
+To avoid robot code restarts, follow the instructions below to replace a vi.lib file and rebuild robot code. To fix a custom dashboard, follow the instructions below regarding custom dashboards.
+
+Dashboard Changes:
+The LabVIEW/default dashboard implements a retry timeout and will close the connection if a valid image is not received after N seconds -- possibly resulting in an error 66 being reported from the roboRIO LabVIEW code. In the 2019 kickoff version of the dashboard, that timeout was set to 10 seconds. For the 2019.2 and 2019.2.1 versions, it has been extended to 30 seconds. We are still investigating why the field conditions take much longer for camera connection and initial image propagation, but the increased timout accomodates the longer connection time.
+
+The dashboard also relies on a localhost socket to be told the robot IP address to establish a Network Tables connection. In some situations, this socket doesn't connect, leaving the dashboard running without a connection to Network Tables. This may also impact camera connection since camera descriptions are shared via Network Tables. The 2019.2.1 dashboard uses an additional socket and protocol for receiving the robot IP address from the Driver Station. Even with this fix, we still see some situations where the Driver Station knows the robot IP, but the dashboard doesn't connect network tables. If this occurs, restart the dashboard and possibly the driver station.
+
+Updating a Custom Dashboard:
+If you need to make these change to a customized dashboard, unzip and copy the vi.lib folder over the C:\Program Files (x86)\National Instruments\LabVIEW 2018\vi.lib folder. Just a few files will be updated -- provided you have permission to overwrite. Rebuilding the custom dashboard will automatically pick up the new timout. To add the additional way to get the robot IP, you need to drop a call to WPI_DashboardGet Robot IP.vi into the dashboard diagram and wire up one wire. To add this VI to your custom dashboard, use the path C:\Program Files (x86)\National Instruments\LabVIEW 2018\vi.lib\Rock Robotics\WPI\Dashboard to open a File Explorer window, and drag/drop the file WPI_DashboardGet Robot IP.vi directly to the Dashboard Main diagram. Wire the required notification refnum (green/magenta) that is also wired into Loop 1. Save and rebuild the dashboard.
+
+----------------------------
+
+Robot Code Changes:
+The LabVIEW camera server, implemented in WPI_CameraSend Images To PC Loop.vi, is responsible for publishing the URLs that enable the dashboard to connect to cameras connected to the roboRIO. The list of URLs include both hostname and resolved IP formats. If the camera server code executes and resolves the IP before the robot radio has assigned an IP address, this can result in an invalid IP address being latched and published. Additionally, if the connection to robot changes (wifi->USB, or radio->roboRIO-ethernet, or USB->wifi, etc.) the published IP address may not work for the new network. Ideally, the hostname form of URL would resolve, allowing for successful camera connection, but current FMS networking often fails to resolve successfully.
+
+Updating Robot Code:
+If you haven't already done so, unzip and copy the vi.lib folder over the C:\Program Files (x86)\National Instruments\LabVIEW 2018\vi.lib folder. Build and Run as Startup to incorporate the updated code.
+
+Details:
+The code to publish the URLs for the camera server now includes all listed interfaces except for localhost forms. It will also republish about every 5 seconds in case the network type changes or completes booting. The host name form is still included in the list of URLs.
